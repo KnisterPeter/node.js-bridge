@@ -8,6 +8,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
+import java.io.Reader;
 import java.io.UnsupportedEncodingException;
 import java.net.URISyntaxException;
 import java.net.URL;
@@ -35,7 +36,8 @@ import de.matrixweb.vfs.VFS;
  */
 public class NodeJsExecutor {
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(NodeJsExecutor.class);
+  private static final Logger LOGGER = LoggerFactory
+      .getLogger(NodeJsExecutor.class);
 
   private final String version = "0.10.18";
 
@@ -57,7 +59,7 @@ public class NodeJsExecutor {
   public NodeJsExecutor() throws NodeJsException {
     try {
       setupBinary();
-    } catch (NodeJsException e) {
+    } catch (final NodeJsException e) {
       if (this.workingDir != null) {
         cleanupBinary();
       }
@@ -86,7 +88,8 @@ public class NodeJsExecutor {
 
   private final void extractBinary(final File target) throws IOException {
     final File node = new File(target, getPlatformExecutable());
-    copyFile("/v" + this.version + "/" + getPlatformPath() + "/" + getPlatformExecutable(), node);
+    copyFile("/v" + this.version + "/" + getPlatformPath() + "/"
+        + getPlatformExecutable(), node);
     node.setExecutable(true, true);
     copyFile("/v" + this.version + "/ipc.js", new File(target, "ipc.js"));
   }
@@ -115,7 +118,8 @@ public class NodeJsExecutor {
     return "node";
   }
 
-  private final void copyFile(final String inputFile, final File outputFile) throws IOException {
+  private final void copyFile(final String inputFile, final File outputFile)
+      throws IOException {
     InputStream in = null;
     try {
       in = getClass().getResourceAsStream(inputFile);
@@ -143,14 +147,16 @@ public class NodeJsExecutor {
    *           Thrown if the installation of the npm-module fails
    * @throws NodeJsException
    */
-  public void addModule(final ClassLoader cl, final String path) throws IOException, NodeJsException {
+  public void addModule(final ClassLoader cl, final String path)
+      throws IOException, NodeJsException {
     final Enumeration<URL> urls = cl.getResources(path);
     while (urls.hasMoreElements()) {
       copyModuleToWorkingDirectory(urls.nextElement());
     }
   }
 
-  private void copyModuleToWorkingDirectory(final URL url) throws IOException, NodeJsException {
+  private void copyModuleToWorkingDirectory(final URL url) throws IOException,
+      NodeJsException {
     try {
       if ("file".equals(url.getProtocol())) {
         copyModuleFromFolder(url);
@@ -166,17 +172,18 @@ public class NodeJsExecutor {
 
   private void copyModuleFromJar(final URL url) throws IOException {
     String str = url.toString();
-    String path = str.substring(str.indexOf('!') + 2);
+    final String path = str.substring(str.indexOf('!') + 2);
     str = str.substring("jar:file:".length(), str.indexOf('!'));
-    JarFile jar = new JarFile(str);
+    final JarFile jar = new JarFile(str);
     try {
-      Enumeration<JarEntry> e = jar.entries();
+      final Enumeration<JarEntry> e = jar.entries();
       while (e.hasMoreElements()) {
-        JarEntry entry = e.nextElement();
+        final JarEntry entry = e.nextElement();
         if (entry.getName().startsWith(path) && !entry.isDirectory()) {
-          File target = new File(this.workingDir, entry.getName().substring(path.length()));
+          final File target = new File(this.workingDir, entry.getName()
+              .substring(path.length()));
           target.getParentFile().mkdirs();
-          InputStream in = jar.getInputStream(entry);
+          final InputStream in = jar.getInputStream(entry);
           FileUtils.copyInputStreamToFile(in, target);
         }
       }
@@ -185,7 +192,8 @@ public class NodeJsExecutor {
     }
   }
 
-  private void copyModuleFromFolder(final URL url) throws URISyntaxException, IOException {
+  private void copyModuleFromFolder(final URL url) throws URISyntaxException,
+      IOException {
     final File file = new File(url.toURI());
     if (file.isDirectory()) {
       FileUtils.copyDirectory(file, this.workingDir);
@@ -208,27 +216,28 @@ public class NodeJsExecutor {
    * @throws IOException
    * @throws NodeJsException
    */
-  public String run(final VFS vfs, final String infile, final Map<String, String> options) throws IOException,
-      NodeJsException {
+  public String run(final VFS vfs, final String infile,
+      final Map<String, String> options) throws IOException, NodeJsException {
     startNodeIfRequired();
     synchronized (this.process) {
-      File temp = File.createTempFile("node-resource", ".dir");
+      final File temp = File.createTempFile("node-resource", ".dir");
       try {
         temp.delete();
         temp.mkdirs();
-        File infolder = new File(temp, "input");
+        final File infolder = new File(temp, "input");
         infolder.mkdirs();
-        File outfolder = new File(temp, "output");
+        final File outfolder = new File(temp, "output");
         outfolder.mkdirs();
 
         vfs.exportFS(infolder);
 
         try {
-          String resultPath = callNode(infile, infolder, outfolder, options);
+          final String resultPath = callNode(infile, infolder, outfolder,
+              options);
           vfs.stack();
           vfs.importFS(outfolder);
           return resultPath;
-        } catch (InternalNodeJsException e) {
+        } catch (final InternalNodeJsException e) {
           return null;
         }
       } finally {
@@ -237,8 +246,9 @@ public class NodeJsExecutor {
     }
   }
 
-  private String callNode(final String infile, final File infolder, final File outfolder,
-      final Map<String, String> options) throws IOException, JsonGenerationException, JsonMappingException,
+  private String callNode(final String infile, final File infolder,
+      final File outfolder, final Map<String, String> options)
+      throws IOException, JsonGenerationException, JsonMappingException,
       JsonParseException, InternalNodeJsException {
     String resultPath = null;
 
@@ -253,7 +263,7 @@ public class NodeJsExecutor {
     this.output.write(this.om.writeValueAsString(command) + '\n');
     this.output.flush();
     waitForResponse();
-    String error = readStdError();
+    final String error = readStdError();
     if (error != null) {
       // TODO: Reconsider error handling
       LOGGER.error(error);
@@ -261,14 +271,15 @@ public class NodeJsExecutor {
     } else {
       // TODO: Implement result handling
       @SuppressWarnings("unchecked")
-      final Map<String, Object> map = this.om.readValue(this.input.readLine(), Map.class);
+      final Map<String, Object> map = this.om.readValue(this.input.readLine(),
+          Map.class);
       if (map.containsKey("stdout")) {
-        for (String line : (List<String>) map.get("stdout")) {
+        for (final String line : (List<String>) map.get("stdout")) {
           LOGGER.info(line);
         }
       }
       if (map.containsKey("stderr")) {
-        for (String line : (List<String>) map.get("stderr")) {
+        for (final String line : (List<String>) map.get("stderr")) {
           LOGGER.error(line);
         }
       }
@@ -290,22 +301,26 @@ public class NodeJsExecutor {
         this.process.exitValue();
       }
       try {
-        final ProcessBuilder builder = new ProcessBuilder(
-            new File(this.workingDir, getPlatformExecutable()).getAbsolutePath(), "ipc.js").directory(this.workingDir);
+        final ProcessBuilder builder = new ProcessBuilder(new File(
+            this.workingDir, getPlatformExecutable()).getAbsolutePath(),
+            "ipc.js").directory(this.workingDir);
         builder.environment().put("NODE_PATH", ".");
         this.process = builder.start();
       } catch (final IOException e) {
         throw new NodeJsException("Unable to start node.js process", e);
       }
       try {
-        this.output = new BufferedWriter(new OutputStreamWriter(this.process.getOutputStream(), "UTF-8"));
-        this.input = new BufferedReader(new InputStreamReader(this.process.getInputStream(), "UTF-8"));
+        this.output = new BufferedWriter(new OutputStreamWriter(
+            this.process.getOutputStream(), "UTF-8"));
+        this.input = new BufferedReader(new InputStreamReader(
+            this.process.getInputStream(), "UTF-8"));
       } catch (final UnsupportedEncodingException e) {
         // Could not happend, since all JVMs must support UTF-8
       }
       try {
         if (!"ipc-ready".equals(this.input.readLine())) {
-          throw new NodeJsException("Unable to start node.js process:\n" + readStdError());
+          throw new NodeJsException("Unable to start node.js process:\n"
+              + readStdError());
         }
       } catch (final IOException e) {
         throw new NodeJsException("Unable to start node.js process", e);
@@ -316,10 +331,11 @@ public class NodeJsExecutor {
   }
 
   private void waitForResponse() throws IOException {
-    while (this.process.getInputStream().available() == 0 && this.process.getErrorStream().available() == 0) {
+    while (this.process.getInputStream().available() == 0
+        && this.process.getErrorStream().available() == 0) {
       try {
         Thread.sleep(100);
-      } catch (InterruptedException e) {
+      } catch (final InterruptedException e) {
         // This could savely be ignored
       }
     }
@@ -328,12 +344,23 @@ public class NodeJsExecutor {
   private String readStdError() throws IOException {
     if (this.process.getErrorStream().available() > 0) {
       final StringBuilder sb = new StringBuilder();
-      final BufferedReader reader = new BufferedReader(new InputStreamReader(this.process.getErrorStream()));
-      String line = reader.readLine();
-      while (line != null) {
-        sb.append(line).append('\n');
-        line = reader.readLine();
+
+      final Reader reader = new InputStreamReader(
+          this.process.getErrorStream(), "UTF-8");
+      int len;
+      final char[] buf = new char[128];
+      while (reader.ready()) {
+        len = reader.read(buf);
+        if (len > -1) {
+          sb.append(buf, 0, len);
+        }
+        try {
+          Thread.sleep(250);
+        } catch (final InterruptedException e) {
+          // Just ignore this
+        }
       }
+
       return sb.toString();
     }
     return null;

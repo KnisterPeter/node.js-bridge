@@ -23,16 +23,35 @@ public class NodeJsExecutorTest {
    */
   @Test
   public void test() throws IOException {
-    NodeJsExecutor exec = new NodeJsExecutor();
+    final NodeJsExecutor exec = new NodeJsExecutor();
     try {
-      VFS vfs = new VFS();
+      final VFS vfs = new VFS();
       try {
         VFSUtils.write(vfs.find("/some.file"), "content");
 
-        Map<String, String> options = Collections.emptyMap();
-        String path = exec.run(vfs, "/some.file", options);
+        final Map<String, String> options = Collections.emptyMap();
+        final String path = exec.run(vfs, "/some.file", options);
 
         assertThat(path, is(nullValue()));
+      } finally {
+        vfs.dispose();
+      }
+    } finally {
+      exec.dispose();
+    }
+  }
+
+  /**
+   * @throws IOException
+   */
+  @Test
+  public void testBrokenIndex() throws IOException {
+    final NodeJsExecutor exec = new NodeJsExecutor();
+    try {
+      final VFS vfs = new VFS();
+      try {
+        exec.addModule(getClass().getClassLoader(), "test-mod");
+        exec.run(vfs, null, null);
       } finally {
         vfs.dispose();
       }
