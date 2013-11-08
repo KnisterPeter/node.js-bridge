@@ -257,7 +257,7 @@ public class NodeJsExecutor {
     final String error = readStdError();
     if (error != null) {
       // TODO: Reconsider error handling
-      LOGGER.error(error);
+      LOGGER.error("node died with: {}", error);
       throw new InternalNodeJsException();
     } else {
       // TODO: Implement result handling
