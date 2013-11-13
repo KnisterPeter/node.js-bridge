@@ -269,42 +269,50 @@ class Worker implements Runnable {
       socket.getOutputStream().write(
           (this.om.writeValueAsString(command) + '\n').getBytes("UTF-8"));
       try {
-        checkNodeProcess();
-        final String result = new BufferedReader(new InputStreamReader(
-            socket.getInputStream(), "UTF-8")).readLine();
-        if (result != null) {
-          @SuppressWarnings("unchecked")
-          final Map<String, Object> map = this.om.readValue(result, Map.class);
-          if (map.containsKey("stdout")) {
-            for (final String line : (List<String>) map.get("stdout")) {
-              LOGGER.info(line);
-            }
-          }
-          if (map.containsKey("stderr")) {
-            for (final String line : (List<String>) map.get("stderr")) {
-              LOGGER.error(line);
-            }
-          }
-          if (map.containsKey("error")) {
-            // TODO: Reconsider error handling
-            LOGGER.error(map.get("error").toString());
-            throw new InternalNodeJsException();
-          }
-          if (map.containsKey("result")) {
-            resultPath = map.get("result").toString();
-          }
-        }
-      } catch (final IOException e) {
-        checkNodeProcess();
-        throw e;
+        final String result = waitForResponse(socket);
+        resultPath = handleResponse(result);
       } catch (final RuntimeException e) {
-        checkNodeProcess();
         throw e;
       }
       return resultPath;
     } finally {
       socket.close();
     }
+  }
+
+  @SuppressWarnings("unchecked")
+  private String handleResponse(final String response) throws IOException {
+    String resultPath = null;
+
+    try {
+      final Map<String, Object> map = this.om.readValue(response, Map.class);
+      if (map.containsKey("output")) {
+        final StringBuilder sb = new StringBuilder();
+        for (final Map<String, Object> entry : (List<Map<String, Object>>) map
+            .get("output")) {
+          if ("INFO".equals(entry.get("level"))) {
+            sb.append("INFO  ");
+          } else if ("ERROR".equals(entry.get("level"))) {
+            sb.append("ERROR ");
+          }
+          sb.append(entry.get("message").toString()).append('\n');
+        }
+        LOGGER.info("node.js output:\n"
+            + sb.toString().replaceAll("\\\\'", "###").replaceAll("'", "")
+                .replaceAll("###", "'"));
+      }
+      if (map.containsKey("error")) {
+        throw new NodeJsException(map.get("error").toString());
+      }
+
+      if (map.containsKey("result")) {
+        resultPath = map.get("result").toString();
+      }
+    } catch (final JsonParseException e) {
+      throw new NodeJsException(response);
+    }
+
+    return resultPath;
   }
 
   private void startNodeIfRequired() throws IOException, NodeJsException {
@@ -334,6 +342,29 @@ class Worker implements Runnable {
     }
   }
 
+  private String waitForResponse(final Socket socket) throws IOException {
+    boolean pIn = false;
+    boolean pEr = false;
+    boolean sIn = false;
+    while (!(pIn || pEr || sIn)) {
+      try {
+        Thread.sleep(25);
+      } catch (final InterruptedException e) {
+        // Ignore this
+      }
+      pIn = this.process.getInputStream().available() > 0;
+      pEr = this.process.getErrorStream().available() > 0;
+      sIn = socket != null ? socket.getInputStream().available() > 0 : false;
+    }
+    if (pIn) {
+      return IOUtils.toString(this.process.getInputStream(), "UTF-8");
+    } else if (pEr) {
+      return IOUtils.toString(this.process.getErrorStream(), "UTF-8");
+    }
+    return new BufferedReader(new InputStreamReader(socket.getInputStream(),
+        "UTF-8")).readLine();
+  }
+
   private void checkNodeProcess() {
     try {
       this.process.exitValue();
@@ -342,7 +373,10 @@ class Worker implements Runnable {
           LOGGER.info(IOUtils.toString(this.process.getInputStream()));
         }
         if (this.process.getErrorStream().available() > 0) {
-          LOGGER.error(IOUtils.toString(this.process.getErrorStream()));
+          final String stderr = IOUtils.toString(this.process.getErrorStream());
+          final Map<String, Object> map = this.om.readValue(stderr, Map.class);
+
+          LOGGER.error("");
         }
       } catch (final IOException e) {
         LOGGER.error("Failed to read process output", e);

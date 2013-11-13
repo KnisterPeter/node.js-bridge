@@ -5,25 +5,23 @@ var writeResponse = function(socket, data) {
   socket.write(data + '\n');
 }
 
-var stdout = [];
-var stderr = [];
+var conout = [];
 console.log = function() {
   var args = Array.prototype.slice.call(arguments);
   args.forEach(function(arg) {
-    stdout.push(util.inspect(arg));
+    conout.push({level: 'INFO', message: util.inspect(arg)});
   });
 }
 console.error = function() {
   var args = Array.prototype.slice.call(arguments);
   args.forEach(function(arg) {
-    stderr.push(util.inspect(arg));
+    conout.push({level: 'ERROR', message: util.inspect(arg)});
   });
 }
 
 var server = net.createServer(function(socket) {
   socket.on('data', function(chunk) {
-    stdout = [];
-    stderr = [];
+    conout = [];
     var chunk = chunk.toString().trim();
     try {
       var command = JSON.parse(chunk);
@@ -31,18 +29,14 @@ var server = net.createServer(function(socket) {
       process.chdir(command.cwd);
       cmd(command, function(output) {
           var result = {
-            'stdout': stdout, 
-            'stderr': stderr
+            'output': conout 
           };
           if (!!output) result.result = output;
           writeResponse(socket, JSON.stringify(result));
         });
     } catch (e) {
-      process.stderr.write(JSON.stringify({
-        'error': util.inspect(e),
-        'stdout': stdout, 
-        'stderr': stderr
-      }) + '\n');
+      writeResponse(socket, 
+          JSON.stringify({'error': util.inspect(e), 'output': conout}));
       process.exit(1);
     }
   });
