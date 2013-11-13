@@ -22,8 +22,15 @@ console.error = function() {
 process.stdin.resume();
 process.stdin.setEncoding('utf8');
 
+var lastChunk = null;
 process.stdin.on('data', function(chunk) {
+  stdout = [];
+  stderr = [];
   try {
+    console.log('chunk ends with newline: ' + (chunk.substring(chunk.length - 1) == '\n'));
+    console.log('REQUESTED: ' + chunk);
+    console.log('LAST     : ' + lastChunk);
+    lastChunk = chunk;
     var command = JSON.parse(chunk);
     process.chdir(command.cwd);
     require('index')(command, function(output) {
