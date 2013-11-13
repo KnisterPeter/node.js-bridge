@@ -272,25 +272,27 @@ class Worker implements Runnable {
         checkNodeProcess();
         final String result = new BufferedReader(new InputStreamReader(
             socket.getInputStream(), "UTF-8")).readLine();
-        @SuppressWarnings("unchecked")
-        final Map<String, Object> map = this.om.readValue(result, Map.class);
-        if (map.containsKey("stdout")) {
-          for (final String line : (List<String>) map.get("stdout")) {
-            LOGGER.info(line);
+        if (result != null) {
+          @SuppressWarnings("unchecked")
+          final Map<String, Object> map = this.om.readValue(result, Map.class);
+          if (map.containsKey("stdout")) {
+            for (final String line : (List<String>) map.get("stdout")) {
+              LOGGER.info(line);
+            }
           }
-        }
-        if (map.containsKey("stderr")) {
-          for (final String line : (List<String>) map.get("stderr")) {
-            LOGGER.error(line);
+          if (map.containsKey("stderr")) {
+            for (final String line : (List<String>) map.get("stderr")) {
+              LOGGER.error(line);
+            }
           }
-        }
-        if (map.containsKey("error")) {
-          // TODO: Reconsider error handling
-          LOGGER.error(map.get("error").toString());
-          throw new InternalNodeJsException();
-        }
-        if (map.containsKey("result")) {
-          resultPath = map.get("result").toString();
+          if (map.containsKey("error")) {
+            // TODO: Reconsider error handling
+            LOGGER.error(map.get("error").toString());
+            throw new InternalNodeJsException();
+          }
+          if (map.containsKey("result")) {
+            resultPath = map.get("result").toString();
+          }
         }
       } catch (final IOException e) {
         checkNodeProcess();
