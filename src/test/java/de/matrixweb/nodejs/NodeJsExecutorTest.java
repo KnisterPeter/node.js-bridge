@@ -21,7 +21,7 @@ public class NodeJsExecutorTest {
   /**
    * @throws IOException
    */
-  @Test
+  @Test(expected = NodeJsException.class)
   public void test() throws IOException {
     final NodeJsExecutor exec = new NodeJsExecutor();
     try {
@@ -44,13 +44,13 @@ public class NodeJsExecutorTest {
   /**
    * @throws IOException
    */
-  @Test
+  @Test(expected = NodeJsException.class)
   public void testBrokenIndex() throws IOException {
     final NodeJsExecutor exec = new NodeJsExecutor();
     try {
       final VFS vfs = new VFS();
       try {
-        exec.addModule(getClass().getClassLoader(), "test-mod");
+        exec.setModule(getClass().getClassLoader(), "test-mod");
         exec.run(vfs, null, null);
       } finally {
         vfs.dispose();

@@ -95,7 +95,6 @@ class Worker implements Runnable {
         + getPlatformExecutable(), node);
     node.setExecutable(true, true);
     copyFile("/v" + this.version + "/ipc.js", new File(target, "ipc.js"));
-    copyFile("/v" + this.version + "/ipc2.js", new File(target, "ipc2.js"));
   }
 
   private final String getPlatformPath() {
@@ -136,6 +135,13 @@ class Worker implements Runnable {
         IOUtils.closeQuietly(in);
       }
     }
+  }
+
+  void copyScriptToWorkingDirectory(final URL url) throws IOException,
+      NodeJsException {
+    copyModuleToWorkingDirectory(url);
+    new File(this.workingDir, new File(url.getPath()).getName())
+        .renameTo(new File(this.workingDir, "index.js"));
   }
 
   void copyModuleToWorkingDirectory(final URL url) throws IOException,
@@ -218,7 +224,6 @@ class Worker implements Runnable {
       this.process.destroy();
       this.process = null;
     }
-    cleanupBinary();
   }
 
   private String execute(final VFS vfs, final String infile,
@@ -235,14 +240,10 @@ class Worker implements Runnable {
 
       vfs.exportFS(infolder);
 
-      try {
-        final String resultPath = callNode(infile, infolder, outfolder, options);
-        vfs.stack();
-        vfs.importFS(outfolder);
-        return resultPath;
-      } catch (final InternalNodeJsException e) {
-        return null;
-      }
+      final String resultPath = callNode(infile, infolder, outfolder, options);
+      vfs.stack();
+      vfs.importFS(outfolder);
+      return resultPath;
     } finally {
       FileUtils.deleteDirectory(temp);
     }
@@ -251,7 +252,7 @@ class Worker implements Runnable {
   private String callNode(final String infile, final File infolder,
       final File outfolder, final Map<String, String> options)
       throws IOException, JsonGenerationException, JsonMappingException,
-      JsonParseException, InternalNodeJsException {
+      JsonParseException {
     String resultPath = null;
 
     final Map<String, Object> command = new HashMap<String, Object>();
@@ -309,7 +310,7 @@ class Worker implements Runnable {
         resultPath = map.get("result").toString();
       }
     } catch (final JsonParseException e) {
-      throw new NodeJsException(response);
+      throw new NodeJsException(response, e);
     }
 
     return resultPath;
@@ -323,7 +324,7 @@ class Worker implements Runnable {
       try {
         final ProcessBuilder builder = new ProcessBuilder(new File(
             this.workingDir, getPlatformExecutable()).getAbsolutePath(),
-            "ipc2.js").directory(this.workingDir);
+            "ipc.js").directory(this.workingDir);
         builder.environment().put("NODE_PATH", ".");
         this.process = builder.start();
       } catch (final IOException e) {
@@ -375,8 +376,7 @@ class Worker implements Runnable {
         if (this.process.getErrorStream().available() > 0) {
           final String stderr = IOUtils.toString(this.process.getErrorStream());
           final Map<String, Object> map = this.om.readValue(stderr, Map.class);
-
-          LOGGER.error("");
+          // TODO:...
         }
       } catch (final IOException e) {
         LOGGER.error("Failed to read process output", e);
@@ -388,6 +388,7 @@ class Worker implements Runnable {
 
   void dispose() {
     this.running = false;
+    cleanupBinary();
   }
 
   public static class Task {
@@ -420,16 +421,11 @@ class Worker implements Runnable {
      */
     public String getResult() throws IOException {
       if (this.exception != null) {
-        throw this.exception;
+        throw new NodeJsException("Failed to execute node.js task",
+            this.exception);
       }
       return this.result;
     }
-
-  }
-
-  private static class InternalNodeJsException extends NodeJsException {
-
-    private static final long serialVersionUID = -1023579709002742028L;
 
   }
 
