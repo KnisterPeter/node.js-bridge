@@ -344,26 +344,48 @@ class Worker implements Runnable {
   }
 
   private String waitForResponse(final Socket socket) throws IOException {
+    boolean sIn = false;
     boolean pIn = false;
     boolean pEr = false;
-    boolean sIn = false;
+    long timeout = System.currentTimeMillis() + 1000 * 5;
     while (!(pIn || pEr || sIn)) {
+      if (System.currentTimeMillis() > timeout) {
+        timeout = System.currentTimeMillis() + 1000 * 5;
+        LOGGER.warn("Timeout -> Send FORCE-BREAK to node process");
+        socket.getOutputStream().write("FORCE-BREAK".getBytes("UTF-8"));
+      }
       try {
         Thread.sleep(25);
       } catch (final InterruptedException e) {
         // Ignore this
       }
+      sIn = socket != null ? socket.getInputStream().available() > 0 : false;
       pIn = this.process.getInputStream().available() > 0;
       pEr = this.process.getErrorStream().available() > 0;
-      sIn = socket != null ? socket.getInputStream().available() > 0 : false;
     }
-    if (pIn) {
-      return IOUtils.toString(this.process.getInputStream(), "UTF-8");
+    if (sIn) {
+      return new BufferedReader(new InputStreamReader(socket.getInputStream(),
+          "UTF-8")).readLine();
+    } else if (pIn) {
+      return readFromInputStream(this.process.getInputStream());
     } else if (pEr) {
-      return IOUtils.toString(this.process.getErrorStream(), "UTF-8");
+      return readFromInputStream(this.process.getErrorStream());
     }
-    return new BufferedReader(new InputStreamReader(socket.getInputStream(),
-        "UTF-8")).readLine();
+    throw new NodeJsException("No response available; Terminating...");
+  }
+
+  private String readFromInputStream(final InputStream in) throws IOException {
+    final StringBuilder sb = new StringBuilder();
+
+    int len = in.available();
+    final byte[] buf = new byte[1024];
+    while (len > 0) {
+      len = in.read(buf, 0, Math.min(len, 1024));
+      sb.append(new String(buf, 0, len, "UTF-8"));
+      len = in.available();
+    }
+
+    return sb.toString();
   }
 
   private void checkNodeProcess() {

@@ -21,23 +21,28 @@ console.error = function() {
 
 var server = net.createServer(function(socket) {
   socket.on('data', function(chunk) {
-    conout = [];
     var chunk = chunk.toString().trim();
-    try {
-      var command = JSON.parse(chunk);
-      var cmd = require('./index');
-      process.chdir(command.cwd);
-      cmd(command, function(output) {
+    if (chunk === 'FORCE-BREAK') {
+      writeResponse(socket, JSON.stringify({'output': conout}));
+      process.exit(1);
+    } else {
+      conout = [];
+      try {
+        var command = JSON.parse(chunk);
+        var cmd = require('./index');
+        process.chdir(command.cwd);
+        cmd(command, function(output) {
           var result = {
             'output': conout 
           };
           if (!!output) result.result = output;
           writeResponse(socket, JSON.stringify(result));
         });
-    } catch (e) {
-      writeResponse(socket, 
+      } catch (e) {
+        writeResponse(socket, 
           JSON.stringify({'error': util.inspect(e), 'output': conout}));
-      process.exit(1);
+        process.exit(1);
+      }
     }
   });
 });
