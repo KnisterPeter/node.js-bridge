@@ -1,51 +1,32 @@
 var util = require('util');
 var net = require('net');
 
-var writeResponse = function(socket, data) {
-  socket.write(data + '\n');
+function prepareOutput(type, args) {
+  args.forEach(function(arg) {
+    var str = util.inspect(arg);
+    str.split('\n').forEach(function(line) {
+      log('//' + type + ': ' + line);
+    });
+  });
 }
-
-var conout = [];
+var log = console.log;
 console.log = function() {
-  var args = Array.prototype.slice.call(arguments);
-  args.forEach(function(arg) {
-    conout.push({level: 'INFO', message: util.inspect(arg)});
-  });
+  prepareOutput('OUT', Array.prototype.slice.call(arguments));
 }
+var err = console.error;
 console.error = function() {
-  var args = Array.prototype.slice.call(arguments);
-  args.forEach(function(arg) {
-    conout.push({level: 'ERROR', message: util.inspect(arg)});
-  });
+  prepareOutput('ERR', Array.prototype.slice.call(arguments));
 }
 
-var server = net.createServer(function(socket) {
-  socket.on('data', function(chunk) {
-    var chunk = chunk.toString().trim();
-    if (chunk === 'FORCE-BREAK') {
-      writeResponse(socket, JSON.stringify({'output': conout}));
-      process.exit(1);
-    } else {
-      conout = [];
-      try {
-        var command = JSON.parse(chunk);
-        var cmd = require('./index');
-        process.chdir(command.cwd);
-        cmd(command, function(output) {
-          var result = {
-            'output': conout 
-          };
-          if (!!output) result.result = output;
-          writeResponse(socket, JSON.stringify(result));
-        });
-      } catch (e) {
-        writeResponse(socket, 
-          JSON.stringify({'error': util.inspect(e), 'output': conout}));
-        process.exit(1);
-      }
-    }
+try {
+  var command = JSON.parse(process.argv[2]);
+  var cmd = require('./index');
+  process.chdir(command.cwd);
+  cmd(command, function(output) {
+    var result = {};
+    if (!!output) result.result = output;
+    log(JSON.stringify(result));
   });
-});
-server.listen(0, '127.0.0.1', function() {
-  process.stdout.write(server.address().port + '\n');
-});
+} catch (e) {
+  log(JSON.stringify({'error': util.inspect(e)}));
+}
