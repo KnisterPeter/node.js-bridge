@@ -28,7 +28,8 @@ import de.matrixweb.vfs.VFS;
  */
 public class NodeJsExecutor {
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(NodeJsExecutor.class);
+  private static final Logger LOGGER = LoggerFactory
+      .getLogger(NodeJsExecutor.class);
 
   private final String version = "0.10.18";
 
@@ -51,7 +52,8 @@ public class NodeJsExecutor {
    * @deprecated Use {@link #setModule(ClassLoader, String)} instead
    */
   @Deprecated
-  public void addModule(final ClassLoader cl, final String path) throws IOException, NodeJsException {
+  public void addModule(final ClassLoader cl, final String path)
+      throws IOException, NodeJsException {
     setModule(cl, path);
   }
 
@@ -68,7 +70,8 @@ public class NodeJsExecutor {
    *           Thrown if the installation of the npm-module fails
    * @throws NodeJsException
    */
-  public void setModule(final ClassLoader cl, final String path) throws IOException, NodeJsException {
+  public void setModule(final ClassLoader cl, final String path)
+      throws IOException, NodeJsException {
     setModule(cl, path, null);
   }
 
@@ -87,8 +90,8 @@ public class NodeJsExecutor {
    *           Thrown if the installation of the npm-module fails
    * @throws NodeJsException
    */
-  public void setModule(final ClassLoader cl, final String path, final String script) throws IOException,
-      NodeJsException {
+  public void setModule(final ClassLoader cl, final String path,
+      final String script) throws IOException, NodeJsException {
     if (this.workingDir != null) {
       throw new NodeJsException("Module already set");
     }
@@ -134,7 +137,8 @@ public class NodeJsExecutor {
 
   private final void extractBinary(final File target) throws IOException {
     final File node = new File(target, getPlatformExecutable());
-    copyFile("/v" + this.version + "/" + getPlatformPath() + "/" + getPlatformExecutable(), node);
+    copyFile("/v" + this.version + "/" + getPlatformPath() + "/"
+        + getPlatformExecutable(), node);
     node.setExecutable(true, true);
     copyFile("/v" + this.version + "/ipc.js", new File(target, "ipc.js"));
   }
@@ -163,7 +167,8 @@ public class NodeJsExecutor {
     return "node";
   }
 
-  private final void copyFile(final String inputFile, final File outputFile) throws IOException {
+  private final void copyFile(final String inputFile, final File outputFile)
+      throws IOException {
     InputStream in = null;
     try {
       in = getClass().getResourceAsStream(inputFile);
@@ -178,12 +183,15 @@ public class NodeJsExecutor {
     }
   }
 
-  void copyScriptToWorkingDirectory(final URL url) throws IOException, NodeJsException {
+  void copyScriptToWorkingDirectory(final URL url) throws IOException,
+      NodeJsException {
     copyModuleToWorkingDirectory(url);
-    new File(this.workingDir, new File(url.getPath()).getName()).renameTo(new File(this.workingDir, "index.js"));
+    new File(this.workingDir, new File(url.getPath()).getName())
+        .renameTo(new File(this.workingDir, "index.js"));
   }
 
-  void copyModuleToWorkingDirectory(final URL url) throws IOException, NodeJsException {
+  void copyModuleToWorkingDirectory(final URL url) throws IOException,
+      NodeJsException {
     try {
       if ("file".equals(url.getProtocol())) {
         copyModuleFromFolder(url);
@@ -223,7 +231,8 @@ public class NodeJsExecutor {
     }
   }
 
-  private void copyModuleFromFolder(final URL url) throws URISyntaxException, IOException {
+  private void copyModuleFromFolder(final URL url) throws URISyntaxException,
+      IOException {
     final File file = new File(url.toURI());
     if (file.isDirectory()) {
       FileUtils.copyDirectory(file, this.workingDir);
@@ -245,7 +254,8 @@ public class NodeJsExecutor {
    * @return Returns the node.js processed result
    * @throws IOException
    */
-  public String run(final VFS vfs, final String infile, final Map<String, String> options) throws IOException {
+  public String run(final VFS vfs, final String infile,
+      final Map<String, String> options) throws IOException {
     if (this.workingDir == null) {
       throw new NodeJsException("Module not set");
     }
@@ -270,21 +280,23 @@ public class NodeJsExecutor {
     }
   }
 
-  private String callNode(final String infile, final File infolder, final File outfolder,
-      final Map<String, String> options) throws IOException {
+  private String callNode(final String infile, final File infolder,
+      final File outfolder, final Map<String, String> options)
+      throws IOException {
     String resultPath = null;
 
     final Map<String, Object> command = new HashMap<String, Object>();
     command.put("cwd", this.workingDir.getAbsolutePath());
     command.put("indir", infolder.getAbsolutePath());
     if (infile != null) {
-      command.put("file", infile.startsWith("/") ? infile.substring(1) : infile);
+      command
+          .put("file", infile.startsWith("/") ? infile.substring(1) : infile);
     }
     command.put("outdir", outfolder.getAbsolutePath());
     command.put("options", options);
 
-    final ProcessBuilder builder = new ProcessBuilder(
-        new File(this.workingDir, getPlatformExecutable()).getAbsolutePath(), "ipc.js",
+    final ProcessBuilder builder = new ProcessBuilder(new File(this.workingDir,
+        getPlatformExecutable()).getAbsolutePath(), "ipc.js",
         this.om.writeValueAsString(command)).directory(this.workingDir);
     builder.environment().put("NODE_PATH", ".");
     try {
@@ -305,11 +317,15 @@ public class NodeJsExecutor {
     String resultPath = null;
 
     try {
-      LOGGER.info("node.js output:\n" + response.replaceAll("(?m)^[^/][^/].*?$", "").replaceAll("(?m)^//", ""));
-      final Map<String, Object> map = this.om.readValue(response.replaceAll("(?m)^//.*?$", ""), Map.class);
+      LOGGER.info("node.js output:\n"
+          + response.replaceAll("(?m)^[^/][^/].*?$", "")
+              .replaceAll("(?m)^//", "").replaceAll("\n+", "\n"));
+      final Map<String, Object> map = this.om.readValue(
+          response.replaceAll("(?m)^//.*?$", ""), Map.class);
       if (map.containsKey("output")) {
         final StringBuilder sb = new StringBuilder();
-        for (final Map<String, Object> entry : (List<Map<String, Object>>) map.get("output")) {
+        for (final Map<String, Object> entry : (List<Map<String, Object>>) map
+            .get("output")) {
           if ("INFO".equals(entry.get("level"))) {
             sb.append("INFO  ");
           } else if ("ERROR".equals(entry.get("level"))) {
@@ -318,9 +334,11 @@ public class NodeJsExecutor {
           sb.append(entry.get("message").toString()).append('\n');
         }
         LOGGER.info("node.js output:\n"
-            + sb.toString().replaceAll("\\\\'", "###").replaceAll("'", "").replaceAll("###", "'"));
+            + sb.toString().replaceAll("\\\\'", "###").replaceAll("'", "")
+                .replaceAll("###", "'"));
       }
       if (map.containsKey("error")) {
+        LOGGER.error(map.get("error").toString());
         throw new NodeJsException(map.get("error").toString());
       }
 
@@ -328,6 +346,8 @@ public class NodeJsExecutor {
         resultPath = map.get("result").toString();
       }
     } catch (final JsonParseException e) {
+      LOGGER.error(response.replaceAll("(?m)^//.*?$", "").replaceAll("\n+",
+          "\n"));
       throw new NodeJsException(response, e);
     }
 
