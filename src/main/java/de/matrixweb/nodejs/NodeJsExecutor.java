@@ -283,9 +283,14 @@ public class NodeJsExecutor {
     command.put("outdir", outfolder.getAbsolutePath());
     command.put("options", options);
 
+    String commandArg = this.om.writeValueAsString(command);
+    if (SystemUtils.IS_OS_WINDOWS) {
+      commandArg = '"' + commandArg.replaceAll("\"", "\\\\\"") + '"';
+    }
+
     final ProcessBuilder builder = new ProcessBuilder(
-        new File(this.workingDir, getPlatformExecutable()).getAbsolutePath(), "ipc.js", '"' + this.om
-            .writeValueAsString(command).replaceAll("\"", "\\\\\"") + '"').directory(this.workingDir);
+        new File(this.workingDir, getPlatformExecutable()).getAbsolutePath(), "ipc.js", commandArg)
+        .directory(this.workingDir);
     builder.environment().put("NODE_PATH", ".");
     try {
       final Process process = builder.start();
