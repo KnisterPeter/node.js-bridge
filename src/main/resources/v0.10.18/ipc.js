@@ -19,7 +19,7 @@ console.error = function() {
 }
 
 try {
-  var command = JSON.parse(process.argv[2]);
+  var command = JSON.parse('' + process.argv[2]);
   var cmd = require('./index');
   process.chdir(command.cwd);
   cmd(command, function(output) {
