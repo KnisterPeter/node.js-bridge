@@ -253,11 +253,17 @@ public class NodeJsExecutor {
     final File temp = File.createTempFile("node-resource", ".dir");
     try {
       temp.delete();
-      temp.mkdirs();
+      if (!temp.mkdirs()) {
+        throw new NodeJsException("Failed to create temp folder " + temp);
+      }
       final File infolder = new File(temp, "input");
-      infolder.mkdirs();
+      if (!infolder.mkdirs()) {
+        throw new NodeJsException("Failed to create temp folder " + infolder);
+      }
       final File outfolder = new File(temp, "output");
-      outfolder.mkdirs();
+      if (!outfolder.mkdirs()) {
+        throw new NodeJsException("Failed to create temp folder " + outfolder);
+      }
 
       vfs.exportFS(infolder);
 
@@ -288,6 +294,7 @@ public class NodeJsExecutor {
       commandArg = '"' + commandArg.replaceAll("\"", "\\\\\"") + '"';
     }
 
+    LOGGER.info("Execute node with json arg: {}", commandArg);
     final ProcessBuilder builder = new ProcessBuilder(
         new File(this.workingDir, getPlatformExecutable()).getAbsolutePath(), "ipc.js", commandArg)
         .directory(this.workingDir);
