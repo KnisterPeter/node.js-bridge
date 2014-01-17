@@ -4,7 +4,7 @@ var net = require('net');
 function prepareOutput(type, args) {
   args.forEach(function(arg) {
     var str = util.inspect(arg);
-    str.split('\n').forEach(function(line) {
+    str.split('\\n').forEach(function(line) {
       log('//' + type + ': ' + line);
     });
   });
@@ -28,5 +28,5 @@ try {
     log(JSON.stringify(result));
   });
 } catch (e) {
-  log(JSON.stringify({'error': util.inspect(e)}));
+  console.error(e.toString(), e.stack);
 }
