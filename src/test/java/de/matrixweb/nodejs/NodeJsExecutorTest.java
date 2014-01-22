@@ -29,7 +29,7 @@ public class NodeJsExecutorTest {
       try {
         VFSUtils.write(vfs.find("/some.file"), "content");
 
-        final Map<String, String> options = Collections.emptyMap();
+        final Map<String, Object> options = Collections.emptyMap();
         final String path = exec.run(vfs, "/some.file", options);
 
         assertThat(path, is(nullValue()));

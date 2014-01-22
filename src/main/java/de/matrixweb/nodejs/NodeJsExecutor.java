@@ -255,7 +255,7 @@ public class NodeJsExecutor {
    * @throws IOException
    */
   public String run(final VFS vfs, final String infile,
-      final Map<String, String> options) throws IOException {
+      final Map<String, Object> options) throws IOException {
     if (this.workingDir == null) {
       throw new NodeJsException("Module not set");
     }
@@ -287,7 +287,7 @@ public class NodeJsExecutor {
   }
 
   private String callNode(final String infile, final File infolder,
-      final File outfolder, final Map<String, String> options)
+      final File outfolder, final Map<String, Object> options)
       throws IOException {
     String resultPath = null;
 
@@ -313,7 +313,7 @@ public class NodeJsExecutor {
     builder.environment().put("NODE_PATH", ".");
     try {
       final Process process = builder.start();
-      final int exitCode = process.waitFor();
+      process.waitFor();
       final String result = waitForResponse(process);
       resultPath = handleResponse(result);
     } catch (final RuntimeException e) {
