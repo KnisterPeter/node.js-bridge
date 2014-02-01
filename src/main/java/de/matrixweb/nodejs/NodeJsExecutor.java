@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URISyntaxException;
 import java.net.URL;
+import java.util.Collections;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.List;
@@ -332,8 +333,10 @@ public class NodeJsExecutor {
       LOGGER.info("node.js output:\n"
           + response.replaceAll("(?m)^[^/][^/].*?$", "")
               .replaceAll("(?m)^//", "").replaceAll("\n+", "\n"));
-      final Map<String, Object> map = this.om.readValue(
-          response.replaceAll("(?m)^//.*?$", ""), Map.class);
+      final String trimmedOutput = response.replaceAll("(?m)^//.*?$", "")
+          .trim();
+      final Map<String, Object> map = trimmedOutput.length() == 0 ? Collections
+          .emptyMap() : this.om.readValue(trimmedOutput, Map.class);
       if (map.containsKey("output")) {
         final StringBuilder sb = new StringBuilder();
         for (final Map<String, Object> entry : (List<Map<String, Object>>) map
