@@ -44,7 +44,7 @@
     <dependency>
       <groupId>de.matrixweb.vfs</groupId>
       <artifactId>vfs</artifactId>
-      <version>0.2.0</version>
+      <version>0.3.0-SNAPSHOT</version>
     </dependency>
     <dependency>
       <groupId>org.apache.commons</groupId>
