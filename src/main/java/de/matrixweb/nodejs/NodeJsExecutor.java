@@ -2,8 +2,10 @@ package de.matrixweb.nodejs;
 
 import java.io.File;
 import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.util.Collections;
@@ -17,6 +19,8 @@ import java.util.jar.JarFile;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.SystemUtils;
+import org.osgi.framework.Bundle;
+import org.osgi.framework.FrameworkUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -40,31 +44,11 @@ public class NodeJsExecutor {
   private File workingDir;
 
   /**
-   * Adds a npm-module folder to the bridge to be called from Java.
-   * 
-   * @param cl
-   *          The {@link ClassLoader} to search the module from (required to be
-   *          OSGi capable)
-   * @param path
-   *          The path or name of the npm-module to install relative to the
-   *          class-path root
-   * @throws IOException
-   *           Thrown if the installation of the npm-module fails
-   * @throws NodeJsException
-   * @deprecated Use {@link #setModule(ClassLoader, String)} instead
-   */
-  @Deprecated
-  public void addModule(final ClassLoader cl, final String path)
-      throws IOException, NodeJsException {
-    setModule(cl, path);
-  }
-
-  /**
    * Sets the npm-module folder to the bridge to be called from Java.
    * 
-   * @param cl
-   *          The {@link ClassLoader} to search the module from (required to be
-   *          OSGi capable)
+   * @param clazz
+   *          The calling {@link Class} to search the module from (required to
+   *          be OSGi capable)
    * @param path
    *          The path or name of the npm-module to install relative to the
    *          class-path root
@@ -72,17 +56,17 @@ public class NodeJsExecutor {
    *           Thrown if the installation of the npm-module fails
    * @throws NodeJsException
    */
-  public void setModule(final ClassLoader cl, final String path)
+  public void setModule(final Class<?> clazz, final String path)
       throws IOException, NodeJsException {
-    setModule(cl, path, null);
+    setModule(clazz, path, null);
   }
 
   /**
    * Sets the npm-module folder to the bridge to be called from Java.
    * 
-   * @param cl
-   *          The {@link ClassLoader} to search the module from (required to be
-   *          OSGi capable)
+   * @param clazz
+   *          The calling {@link Class} to search the module from (required to
+   *          be OSGi capable)
    * @param path
    *          The path or name of the npm-module to install relative to the
    *          class-path root
@@ -92,7 +76,7 @@ public class NodeJsExecutor {
    *           Thrown if the installation of the npm-module fails
    * @throws NodeJsException
    */
-  public void setModule(final ClassLoader cl, final String path,
+  public void setModule(final Class<?> clazz, final String path,
       final String script) throws IOException, NodeJsException {
     if (this.workingDir != null) {
       throw new NodeJsException("Module already set");
@@ -107,12 +91,13 @@ public class NodeJsExecutor {
       throw e;
     }
 
-    final Enumeration<URL> urls = cl.getResources(path);
+    final Enumeration<URL> urls = clazz.getClassLoader().getResources(path);
     while (urls.hasMoreElements()) {
-      copyModuleToWorkingDirectory(urls.nextElement());
+      copyModuleToWorkingDirectory(urls.nextElement(), clazz);
     }
     if (script != null) {
-      copyScriptToWorkingDirectory(cl.getResource(script));
+      copyScriptToWorkingDirectory(clazz.getClassLoader().getResource(script),
+          clazz);
     }
   }
 
@@ -129,6 +114,7 @@ public class NodeJsExecutor {
 
   private final void cleanupBinary() {
     if (this.workingDir != null) {
+      LOGGER.info("Shutdown nodejs (removing {})", this.workingDir);
       try {
         FileUtils.deleteDirectory(this.workingDir);
       } catch (final IOException e) {
@@ -185,20 +171,22 @@ public class NodeJsExecutor {
     }
   }
 
-  void copyScriptToWorkingDirectory(final URL url) throws IOException,
-      NodeJsException {
-    copyModuleToWorkingDirectory(url);
+  void copyScriptToWorkingDirectory(final URL url, final Class<?> clazz)
+      throws IOException, NodeJsException {
+    copyModuleToWorkingDirectory(url, clazz);
     new File(this.workingDir, new File(url.getPath()).getName())
         .renameTo(new File(this.workingDir, "index.js"));
   }
 
-  void copyModuleToWorkingDirectory(final URL url) throws IOException,
-      NodeJsException {
+  void copyModuleToWorkingDirectory(final URL url, final Class<?> clazz)
+      throws IOException, NodeJsException {
     try {
       if ("file".equals(url.getProtocol())) {
         copyModuleFromFolder(url);
       } else if ("jar".equals(url.getProtocol())) {
         copyModuleFromJar(url);
+      } else if ("bundle".equals(url.getProtocol())) {
+        copyModuleFromBundle(url, clazz);
       } else {
         throw new NodeJsException("Unsupported url schema: " + url);
       }
@@ -240,6 +228,43 @@ public class NodeJsExecutor {
       FileUtils.copyDirectory(file, this.workingDir);
     } else {
       FileUtils.copyFileToDirectory(file, this.workingDir);
+    }
+  }
+
+  private void copyModuleFromBundle(final URL url, final Class<?> clazz)
+      throws URISyntaxException, IOException {
+    LOGGER.info("Searching calling bundle for {}", url.getPath());
+    final Bundle bundle = FrameworkUtil.getBundle(clazz);
+    final Enumeration<URL> urls = bundle.findEntries(url.getPath(), null, true);
+    if (urls != null) {
+      while (urls.hasMoreElements()) {
+        final URL resourceUrl = urls.nextElement();
+        final File target = new File(this.workingDir, resourceUrl.getPath()
+            .substring(url.getPath().length()));
+        target.getParentFile().mkdirs();
+        if (resourceUrl.getPath().endsWith("/")) {
+          target.mkdir();
+        } else {
+          copyUrlFile(resourceUrl, target);
+        }
+      }
+    } else {
+      copyUrlFile(bundle.getEntry(url.getPath()),
+          new File(this.workingDir, url.getPath()));
+    }
+  }
+
+  private void copyUrlFile(final URL url, final File target) throws IOException {
+    final InputStream in = url.openStream();
+    try {
+      final OutputStream out = new FileOutputStream(target);
+      try {
+        IOUtils.copy(in, out);
+      } finally {
+        IOUtils.closeQuietly(out);
+      }
+    } finally {
+      IOUtils.closeQuietly(in);
     }
   }
 

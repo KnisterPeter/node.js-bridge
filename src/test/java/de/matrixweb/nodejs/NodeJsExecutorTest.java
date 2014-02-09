@@ -50,7 +50,7 @@ public class NodeJsExecutorTest {
     try {
       final VFS vfs = new VFS();
       try {
-        exec.setModule(getClass().getClassLoader(), "test-mod");
+        exec.setModule(getClass(), "test-mod");
         exec.run(vfs, null, null);
       } finally {
         vfs.dispose();
