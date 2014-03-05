@@ -252,6 +252,7 @@ public class NodeJsExecutor {
       copyUrlFile(bundle.getEntry(url.getPath()),
           new File(this.workingDir, url.getPath()));
     }
+    LOGGER.info("Done searching bundle");
   }
 
   private void copyUrlFile(final URL url, final File target) throws IOException {
