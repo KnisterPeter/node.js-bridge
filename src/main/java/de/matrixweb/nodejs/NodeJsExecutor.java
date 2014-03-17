@@ -13,6 +13,8 @@ import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 
@@ -340,10 +342,7 @@ public class NodeJsExecutor {
         .directory(this.workingDir);
     builder.environment().put("NODE_PATH", ".");
     try {
-      final Process process = builder.start();
-      process.waitFor();
-      final String result = waitForResponse(process);
-      resultPath = handleResponse(result);
+      resultPath = handleResponse(new ProcessExector(builder).getResult());
     } catch (final RuntimeException e) {
       throw e;
     } catch (final InterruptedException e) {
@@ -408,6 +407,58 @@ public class NodeJsExecutor {
    */
   public void dispose() {
     cleanupBinary();
+  }
+  
+  private class ProcessExector extends Thread {
+    
+    private CountDownLatch latch = new CountDownLatch(1);
+    
+    private ProcessBuilder builder;
+    
+    private Process process;
+    
+    private String result;
+    
+    private Exception exception;
+    
+    /**
+     * @param builder
+     */
+    public ProcessExector(ProcessBuilder builder) {
+      this.builder = builder;
+      this.start();
+    }
+
+    /**
+     * @see java.lang.Thread#run()
+     */
+    @Override
+    public void run() {
+      try {
+        process = builder.start();
+        process.waitFor();
+        result = waitForResponse(process);
+        process = null;
+      } catch (Exception e) {
+        exception = e;
+      }
+      latch.countDown();
+    }
+    
+    public String getResult() throws InterruptedException {
+      latch.await(3, TimeUnit.MINUTES);
+      if (process != null) {
+        process.destroy();
+      }
+      if (exception != null) {
+        if (exception instanceof RuntimeException) {
+          throw (RuntimeException) exception;
+        }
+        throw new RuntimeException("Failed to execute node process", exception);
+      }
+      return result;
+    }
+    
   }
 
 }
