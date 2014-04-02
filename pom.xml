@@ -50,7 +50,7 @@
     <dependency>
       <groupId>de.matrixweb.vfs</groupId>
       <artifactId>vfs</artifactId>
-      <version>0.3.1-SNAPSHOT</version>
+      <version>0.3.2</version>
     </dependency>
     <dependency>
       <groupId>org.apache.commons</groupId>
